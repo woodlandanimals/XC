@@ -1,0 +1,76 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --good: #22c55e;
+  --good-bg: #f0fdf4;
+  --marginal: #f59e0b;
+  --marginal-bg: #fffbeb;
+  --poor: #dc2626;
+  --poor-bg: #fef2f2;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  background: #fafafa;
+}
+
+.font-mono {
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* Teenage Engineering inspired grid lines */
+.te-grid {
+  background-image:
+    linear-gradient(to right, #e5e5e5 1px, transparent 1px),
+    linear-gradient(to bottom, #e5e5e5 1px, transparent 1px);
+  background-size: 8px 8px;
+}
+
+/* Good condition - prominent green accent */
+.condition-good {
+  border-left: 4px solid var(--good);
+  background: linear-gradient(to right, var(--good-bg) 0%, white 100%);
+}
+
+.condition-good .status-bar {
+  background: var(--good);
+}
+
+/* Marginal condition - amber accent */
+.condition-marginal {
+  border-left: 4px solid var(--marginal);
+  background: linear-gradient(to right, var(--marginal-bg) 0%, white 100%);
+}
+
+.condition-marginal .status-bar {
+  background: var(--marginal);
+}
+
+/* Poor condition - muted, less prominent */
+.condition-poor {
+  border-left: 4px solid #d4d4d4;
+  background: white;
+  opacity: 0.7;
+}
+
+.condition-poor:hover {
+  opacity: 1;
+}
+
+/* Data label styling - industrial look */
+.data-label {
+  @apply text-[10px] uppercase tracking-[0.15em] text-neutral-400 font-mono;
+}
+
+.data-value {
+  @apply text-lg font-mono font-semibold text-neutral-900 tabular-nums;
+}
+
+.data-unit {
+  @apply text-xs font-mono text-neutral-400 ml-0.5;
+}
