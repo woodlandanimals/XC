@@ -35,6 +35,49 @@ const WeeklyView: React.FC<WeeklyViewProps> = ({ forecasts }) => {
 
   const dates = Array.from({ length: 7 }, (_, i) => getPacificDate(i));
 
+  // Helper to determine if a day is flyable (same logic as cell coloring)
+  const getDayFlyability = (siteForecast: SiteForecast, dayIndex: number): 'green' | 'yellow' | 'red' => {
+    const forecast = siteForecast.forecast[dayIndex];
+    if (!forecast) return 'red';
+
+    // Soaring label logic
+    const getSoaringLabel = () => {
+      if (!forecast.windDirectionMatch) return 'Cross';
+      if (forecast.windSpeed > siteForecast.site.maxWind || forecast.windGust > siteForecast.site.maxWind * 1.25) return 'Strong';
+      if (forecast.soaringFlyability === 'good') return 'Good';
+      if (forecast.soaringFlyability === 'marginal') return 'Wind OK';
+      if (forecast.windSpeed < 8) return 'Light';
+      return 'Wind OK';
+    };
+
+    const soaringLabel = getSoaringLabel();
+    const isSoaringFlyable = soaringLabel === 'Good' || soaringLabel === 'Wind OK' || soaringLabel === 'Strong';
+    const isThermalFlyable = forecast.thermalFlyability === 'good' || forecast.thermalFlyability === 'marginal';
+
+    if (isSoaringFlyable && (soaringLabel === 'Good' || forecast.thermalFlyability === 'good')) {
+      return 'green';
+    }
+    if (isSoaringFlyable || isThermalFlyable) {
+      return 'yellow';
+    }
+    return 'red';
+  };
+
+  // Sort forecasts by flyability score (green=2, yellow=1, red=0)
+  const sortedForecasts = [...forecasts].sort((a, b) => {
+    let scoreA = 0;
+    let scoreB = 0;
+
+    for (let i = 0; i < 7; i++) {
+      const flyA = getDayFlyability(a, i);
+      const flyB = getDayFlyability(b, i);
+      scoreA += flyA === 'green' ? 2 : flyA === 'yellow' ? 1 : 0;
+      scoreB += flyB === 'green' ? 2 : flyB === 'yellow' ? 1 : 0;
+    }
+
+    return scoreB - scoreA;
+  });
+
   return (
     <div className="overflow-x-auto">
       <table className="w-full border-collapse">
@@ -54,7 +97,7 @@ const WeeklyView: React.FC<WeeklyViewProps> = ({ forecasts }) => {
           </tr>
         </thead>
         <tbody>
-          {forecasts.map((siteForecast) => (
+          {sortedForecasts.map((siteForecast) => (
             <tr key={siteForecast.site.id} className="border-b border-neutral-200 hover:bg-neutral-50">
               <td className="p-4 sticky left-0 bg-white z-10 border-r border-neutral-200">
                 <div>
