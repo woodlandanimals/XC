@@ -84,11 +84,29 @@ const WeeklyView: React.FC<WeeklyViewProps> = ({ forecasts }) => {
                   );
                 }
 
-                const getFlyabilityLabel = (flyability: string) => {
+                const getThermalLabel = (flyability: string) => {
                   if (flyability === 'good') return 'Good';
                   if (flyability === 'marginal') return 'Moderate';
                   return 'Stable';
                 };
+
+                // Soaring label based on wind direction match and wind speed
+                const getSoaringLabel = () => {
+                  if (!forecast.windDirectionMatch) return 'Cross';
+                  if (forecast.windSpeed > siteForecast.site.maxWind || forecast.windGust > siteForecast.site.maxWind * 1.25) return 'Strong';
+                  if (forecast.soaringFlyability === 'good') return 'Good';
+                  if (forecast.soaringFlyability === 'marginal') return 'Wind OK';
+                  if (forecast.windSpeed < 6) return 'Light';
+                  return 'Wind OK';
+                };
+
+                const soaringLabel = getSoaringLabel();
+                const soaringColorClass =
+                  soaringLabel === 'Good' ? 'text-green-700 font-bold' :
+                  soaringLabel === 'Wind OK' ? 'text-green-600' :
+                  soaringLabel === 'Cross' ? 'text-red-600' :
+                  soaringLabel === 'Strong' ? 'text-red-600' :
+                  'text-neutral-600';
 
                 return (
                   <td key={dayIndex} className="p-4">
@@ -96,14 +114,14 @@ const WeeklyView: React.FC<WeeklyViewProps> = ({ forecasts }) => {
                       <div className="font-mono text-xs">
                         <div className="flex gap-2 mb-1">
                           <span className="text-neutral-500">S:</span>
-                          <span className={forecast.soaringFlyability === 'good' ? 'text-green-700 font-bold' : 'text-neutral-600'}>
-                            {getFlyabilityLabel(forecast.soaringFlyability)}
+                          <span className={soaringColorClass}>
+                            {soaringLabel}
                           </span>
                         </div>
                         <div className="flex gap-2 mb-1">
                           <span className="text-neutral-500">T:</span>
                           <span className={forecast.thermalFlyability === 'good' ? 'text-green-700 font-bold' : 'text-neutral-600'}>
-                            {getFlyabilityLabel(forecast.thermalFlyability)}
+                            {getThermalLabel(forecast.thermalFlyability)}
                           </span>
                         </div>
                         <div className="text-[10px] text-neutral-600 mt-2 flex items-center gap-1">
