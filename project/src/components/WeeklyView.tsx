@@ -1,12 +1,14 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { SiteForecast } from '../types/weather';
 import WindArrow from './WindArrow';
+import SiteDetailModal from './SiteDetailModal';
 
 interface WeeklyViewProps {
   forecasts: SiteForecast[];
 }
 
 const WeeklyView: React.FC<WeeklyViewProps> = ({ forecasts }) => {
+  const [selectedSite, setSelectedSite] = useState<{ siteForecast: SiteForecast; dayIndex: number } | null>(null);
   // Generate 7 days starting from today in Pacific timezone
   // This must match the weatherService which uses Pacific time for forecast dates
   const getPacificDate = (daysOffset: number) => {
@@ -161,7 +163,11 @@ const WeeklyView: React.FC<WeeklyViewProps> = ({ forecasts }) => {
                 };
 
                 return (
-                  <td key={dayIndex} className="p-4">
+                  <td
+                    key={dayIndex}
+                    className="p-4 cursor-pointer hover:bg-neutral-100 transition-colors"
+                    onClick={() => setSelectedSite({ siteForecast, dayIndex })}
+                  >
                     <div className={`border-l-2 pl-3 ${getCellColor()}`}>
                       <div className="font-mono text-xs">
                         <div className="flex gap-2 mb-1">
@@ -192,6 +198,16 @@ const WeeklyView: React.FC<WeeklyViewProps> = ({ forecasts }) => {
           ))}
         </tbody>
       </table>
+
+      {selectedSite && (
+        <SiteDetailModal
+          siteForecast={{
+            site: selectedSite.siteForecast.site,
+            forecast: [selectedSite.siteForecast.forecast[selectedSite.dayIndex]]
+          }}
+          onClose={() => setSelectedSite(null)}
+        />
+      )}
     </div>
   );
 };
