@@ -104,8 +104,8 @@ const WeeklyView: React.FC<WeeklyViewProps> = ({ forecasts }) => {
                 const soaringColorClass =
                   soaringLabel === 'Good' ? 'text-green-700 font-bold' :
                   soaringLabel === 'Wind OK' ? 'text-green-600' :
+                  soaringLabel === 'Strong' ? 'text-amber-600' :  // Strong but flyable - amber
                   soaringLabel === 'Cross' ? 'text-red-600' :
-                  soaringLabel === 'Strong' ? 'text-red-600' :
                   'text-neutral-600';
 
                 return (

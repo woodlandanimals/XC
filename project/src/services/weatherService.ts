@@ -652,6 +652,7 @@ const checkWindDirectionMatch = (windDir: number, siteOrientation: string): bool
     'S-NW': [[165, 345]],  // For Ed Levin - wide range from S through W to NW
     'W-SW': [[225, 285]],
     'E-SE': [[75, 165]],
+    'NE-SE': [[30, 165]],  // For Channing East - NE through E to SE
     'NW-N': [[315, 360], [0, 15]]
   };
 

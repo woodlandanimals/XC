@@ -177,7 +177,7 @@ export const launchSites: LaunchSite[] = [
     elevation: 200,
     latitude: 38.0686,
     longitude: -122.1472,
-    orientation: 'E-SE',
+    orientation: 'NE-SE',
     maxWind: 12,
     siteType: 'mixed'  // Ridge + thermal
   },
