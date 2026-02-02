@@ -35,12 +35,6 @@ const WeeklyView: React.FC<WeeklyViewProps> = ({ forecasts }) => {
 
   const dates = Array.from({ length: 7 }, (_, i) => getPacificDate(i));
 
-  const getScoreColor = (soaring: string, thermal: string) => {
-    if (soaring === 'good' || thermal === 'good') return 'bg-green-100 border-green-400';
-    if (soaring === 'marginal' || thermal === 'marginal') return 'bg-yellow-100 border-yellow-400';
-    return 'bg-red-100 border-red-400';
-  };
-
   return (
     <div className="overflow-x-auto">
       <table className="w-full border-collapse">
@@ -108,9 +102,24 @@ const WeeklyView: React.FC<WeeklyViewProps> = ({ forecasts }) => {
                   soaringLabel === 'Cross' ? 'text-red-600' :
                   'text-neutral-600';
 
+                // Determine cell background based on actual flyability
+                // Soaring is flyable if wind direction matches and wind is in range
+                const isSoaringFlyable = soaringLabel === 'Good' || soaringLabel === 'Wind OK' || soaringLabel === 'Strong';
+                const isThermalFlyable = forecast.thermalFlyability === 'good' || forecast.thermalFlyability === 'marginal';
+
+                const getCellColor = () => {
+                  if (isSoaringFlyable && (soaringLabel === 'Good' || forecast.thermalFlyability === 'good')) {
+                    return 'bg-green-100 border-green-400';
+                  }
+                  if (isSoaringFlyable || isThermalFlyable) {
+                    return 'bg-yellow-100 border-yellow-400';
+                  }
+                  return 'bg-red-100 border-red-400';
+                };
+
                 return (
                   <td key={dayIndex} className="p-4">
-                    <div className={`border-l-2 pl-3 ${getScoreColor(forecast.soaringFlyability, forecast.thermalFlyability)}`}>
+                    <div className={`border-l-2 pl-3 ${getCellColor()}`}>
                       <div className="font-mono text-xs">
                         <div className="flex gap-2 mb-1">
                           <span className="text-neutral-500">S:</span>
