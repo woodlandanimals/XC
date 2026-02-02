@@ -13,7 +13,8 @@ const Header: React.FC<HeaderProps> = ({ lastUpdated, onRefresh, isLoading, view
   return (
     <header className="bg-white border-b border-neutral-200">
       <div className="max-w-6xl mx-auto px-4 py-4">
-        <div className="flex items-center justify-between">
+        {/* Desktop layout */}
+        <div className="hidden md:flex items-center justify-between">
           {/* Logo - TE inspired minimal type */}
           <div className="flex items-baseline gap-3">
             <h1 className="font-mono text-xl font-bold tracking-tight text-neutral-900">
@@ -75,6 +76,67 @@ const Header: React.FC<HeaderProps> = ({ lastUpdated, onRefresh, isLoading, view
             >
               <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
             </button>
+          </div>
+        </div>
+
+        {/* Mobile layout */}
+        <div className="md:hidden">
+          {/* Top row: Logo and refresh */}
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <h1 className="font-mono text-lg font-bold tracking-tight text-neutral-900">
+                XC–FORECAST
+              </h1>
+              <span className="font-mono text-[9px] uppercase tracking-[0.2em] text-neutral-400">
+                California
+              </span>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="font-mono text-[10px] text-neutral-500 tabular-nums">
+                {lastUpdated.toLocaleTimeString([], {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  hour12: false
+                })}
+              </div>
+              <button
+                onClick={onRefresh}
+                disabled={isLoading}
+                className="w-8 h-8 flex items-center justify-center border border-neutral-300
+                         hover:border-neutral-900 hover:bg-neutral-900 hover:text-white
+                         disabled:opacity-50 transition-all duration-150"
+                aria-label="Refresh forecasts"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
+              </button>
+            </div>
+          </div>
+
+          {/* Bottom row: Compact toggle */}
+          <div className="flex justify-center">
+            <div className="inline-flex border border-neutral-300 bg-white">
+              <button
+                onClick={() => onViewChange('today')}
+                className={`px-4 py-1.5 font-mono text-[10px] uppercase tracking-wider transition-all ${
+                  view === 'today'
+                    ? 'bg-neutral-900 text-white'
+                    : 'bg-white text-neutral-600'
+                }`}
+              >
+                Today
+              </button>
+              <button
+                onClick={() => onViewChange('weekly')}
+                className={`px-4 py-1.5 font-mono text-[10px] uppercase tracking-wider transition-all border-l border-neutral-300 ${
+                  view === 'weekly'
+                    ? 'bg-neutral-900 text-white'
+                    : 'bg-white text-neutral-600'
+                }`}
+              >
+                Weekly
+              </button>
+            </div>
           </div>
         </div>
       </div>
