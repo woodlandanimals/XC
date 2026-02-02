@@ -17,7 +17,7 @@ export const launchSites: LaunchSite[] = [
     elevation: 1750,
     latitude: 37.4656,
     longitude: -121.8531,
-    orientation: 'SW-NW',
+    orientation: 'S-NW',
     maxWind: 20,
     siteType: 'mixed'  // Training hill + thermals
   },

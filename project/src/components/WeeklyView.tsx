@@ -6,20 +6,33 @@ interface WeeklyViewProps {
 }
 
 const WeeklyView: React.FC<WeeklyViewProps> = ({ forecasts }) => {
-  // Generate 7 days starting from today
-  const dates = Array.from({ length: 7 }, (_, i) => {
-    const date = new Date();
-    date.setDate(date.getDate() + i);
-    return date;
-  });
+  // Generate 7 days starting from today in Pacific timezone
+  // This must match the weatherService which uses Pacific time for forecast dates
+  const getPacificDate = (daysOffset: number) => {
+    const now = new Date();
+    const date = new Date(now);
+    date.setDate(date.getDate() + daysOffset);
 
-  const formatDate = (date: Date) => {
-    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    // Get the date components in Pacific timezone
+    const pacificDateStr = date.toLocaleDateString('en-US', {
+      timeZone: 'America/Los_Angeles',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      weekday: 'short'
+    });
+
+    // Parse "Sun, 02/02/2026" format
+    const [weekday, dateStr] = pacificDateStr.split(', ');
+    const [month, day] = dateStr.split('/');
+
     return {
-      dayOfWeek: days[date.getDay()],
-      monthDay: `${date.getMonth() + 1}/${date.getDate()}`
+      dayOfWeek: weekday,
+      monthDay: `${parseInt(month)}/${parseInt(day)}`
     };
   };
+
+  const dates = Array.from({ length: 7 }, (_, i) => getPacificDate(i));
 
   const getScoreColor = (soaring: string, thermal: string) => {
     if (soaring === 'good' || thermal === 'good') return 'bg-green-100 border-green-400';
@@ -35,17 +48,14 @@ const WeeklyView: React.FC<WeeklyViewProps> = ({ forecasts }) => {
             <th className="text-left p-4 font-mono text-xs uppercase tracking-wider text-neutral-900 sticky left-0 bg-neutral-50 z-10">
               Site
             </th>
-            {dates.map((date, i) => {
-              const { dayOfWeek, monthDay } = formatDate(date);
-              return (
-                <th key={i} className="p-4 font-mono text-xs uppercase tracking-wider text-neutral-900 min-w-[120px]">
-                  <div className="text-center">
-                    <div className="font-bold">{dayOfWeek}</div>
-                    <div className="text-[10px] text-neutral-500 mt-1">{monthDay}</div>
-                  </div>
-                </th>
-              );
-            })}
+            {dates.map((date, i) => (
+              <th key={i} className="p-4 font-mono text-xs uppercase tracking-wider text-neutral-900 min-w-[120px]">
+                <div className="text-center">
+                  <div className="font-bold">{date.dayOfWeek}</div>
+                  <div className="text-[10px] text-neutral-500 mt-1">{date.monthDay}</div>
+                </div>
+              </th>
+            ))}
           </tr>
         </thead>
         <tbody>
