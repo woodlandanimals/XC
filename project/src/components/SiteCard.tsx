@@ -1,6 +1,7 @@
 import React from 'react';
 import { SiteForecast } from '../types/weather';
 import { getWindDirection } from '../services/weatherService';
+import WindArrow from './WindArrow';
 
 interface SiteCardProps {
   siteForecast: SiteForecast;
@@ -44,6 +45,15 @@ const SiteCard: React.FC<SiteCardProps> = ({ siteForecast, onClick }) => {
     }
   };
 
+  const getSiteTypeLabel = () => {
+    switch (site.siteType) {
+      case 'thermal': return '↑ Thermal';
+      case 'soaring': return '〰 Ridge';
+      case 'mixed': return '↑〰 Mixed';
+      default: return '';
+    }
+  };
+
   return (
     <div
       className={`${getConditionClass()} p-4 cursor-pointer hover:shadow-md transition-shadow duration-150`}
@@ -57,6 +67,9 @@ const SiteCard: React.FC<SiteCardProps> = ({ siteForecast, onClick }) => {
           </h3>
           <div className="font-mono text-[10px] text-neutral-400 tracking-wide">
             {site.elevation.toLocaleString()}′ · {site.orientation}
+          </div>
+          <div className="font-mono text-[9px] text-neutral-500 mt-0.5">
+            {getSiteTypeLabel()}
           </div>
         </div>
 
@@ -82,7 +95,10 @@ const SiteCard: React.FC<SiteCardProps> = ({ siteForecast, onClick }) => {
         {/* Wind */}
         <div>
           <div className="data-label">Wind</div>
-          <div className="data-value">{today.windSpeed}</div>
+          <div className="data-value flex items-center gap-1">
+            <WindArrow direction={today.windDirection} size={16} className="text-neutral-700" />
+            {today.windSpeed}
+          </div>
           <div className="font-mono text-[10px] text-neutral-500">
             {getWindDirection(today.windDirection)} G{today.windGust}
           </div>
@@ -113,6 +129,15 @@ const SiteCard: React.FC<SiteCardProps> = ({ siteForecast, onClick }) => {
       <div className="font-mono text-[11px] text-neutral-600 leading-relaxed mb-2 line-clamp-2">
         {today.conditions}
       </div>
+
+      {/* XC potential indicator */}
+      {today.xcPotential && today.xcPotential !== 'low' && (
+        <div className={`inline-flex items-center gap-1 px-2 py-0.5 mb-2 text-[9px] uppercase tracking-wider font-mono font-medium
+          ${today.xcPotential === 'high' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+          XC: {today.xcPotential}
+          {today.xcReason && <span className="text-[8px] normal-case ml-1 opacity-75">— {today.xcReason}</span>}
+        </div>
+      )}
 
       {/* Rain warning if present */}
       {today.rainInfo && (

@@ -1,4 +1,4 @@
-import { LaunchSite, WeatherCondition, SiteForecast } from '../types/weather';
+import { LaunchSite, WeatherCondition, SiteForecast, HourlyDataPoint } from '../types/weather';
 import { launchSites } from '../data/launchSites';
 
 const weatherCache = new Map<string, { data: any; timestamp: number }>();
@@ -230,16 +230,18 @@ const processECMWFDataForDay = (site: LaunchSite, data: any, targetDate: string)
       liftedIndex
     );
 
-    const launchTime = calculateLaunchTime(
-      thermalFlyability,
-      soaringFlyability,
-      thermalStrength,
-      windSpeed,
-      temperature,
-      tcon
-    );
-
     const rainInfo = analyzeRain(hourly, targetDate);
+
+    // Extract hourly data first so we can use it for launch time calculation
+    const hourlyData = extractHourlyData(site, hourly, targetDate);
+
+    // Calculate launch time using hourly data for better accuracy
+    const launchTime = hourlyData.length > 0
+      ? calculateLaunchTimeFromHourly(hourlyData, site, site.orientation)
+      : calculateLaunchTime(thermalFlyability, soaringFlyability, thermalStrength, windSpeed, temperature, tcon);
+
+    // Calculate XC potential
+    const { xcPotential, xcReason } = calculateXCPotential(topOfLift, thermalStrength, windSpeed, site);
 
     return {
       date: targetDate,
@@ -256,6 +258,9 @@ const processECMWFDataForDay = (site: LaunchSite, data: any, targetDate: string)
       soaringFlyability,
       thermalFlyability,
       launchTime,
+      xcPotential,
+      xcReason,
+      hourlyData,
       wind850mb: undefined,
       windDir850mb: undefined,
       wind700mb: undefined,
@@ -369,16 +374,18 @@ const processHRRRDataForDay = (site: LaunchSite, data: any, targetDate: string):
       liftedIndex
     );
 
-    const launchTime = calculateLaunchTime(
-      thermalFlyability,
-      soaringFlyability,
-      thermalStrength,
-      windSpeed,
-      temperature,
-      tcon
-    );
-
     const rainInfo = analyzeRain(hourly, targetDate);
+
+    // Extract hourly data first so we can use it for launch time calculation
+    const hourlyData = extractHourlyData(site, hourly, targetDate);
+
+    // Calculate launch time using hourly data for better accuracy
+    const launchTime = hourlyData.length > 0
+      ? calculateLaunchTimeFromHourly(hourlyData, site, site.orientation)
+      : calculateLaunchTime(thermalFlyability, soaringFlyability, thermalStrength, windSpeed, temperature, tcon);
+
+    // Calculate XC potential
+    const { xcPotential, xcReason } = calculateXCPotential(topOfLift, thermalStrength, windSpeed, site);
 
     return {
       date: targetDate,
@@ -395,6 +402,9 @@ const processHRRRDataForDay = (site: LaunchSite, data: any, targetDate: string):
       soaringFlyability,
       thermalFlyability,
       launchTime,
+      xcPotential,
+      xcReason,
+      hourlyData,
       wind850mb: wind850mb ? Math.round(wind850mb) : undefined,
       windDir850mb,
       wind700mb: wind700mb ? Math.round(wind700mb) : undefined,
@@ -428,6 +438,67 @@ const calculateLCL = (tempF: number, dewPointF: number, elevationFt: number): { 
   const tcon = dewPointF + (lclAGL_ft / 1000) * 5.4;
 
   return { lclMSL: lclMSL_ft, tcon: Math.round(tcon) };
+};
+
+const calculateXCPotential = (
+  topOfLift: number,
+  thermalStrength: number,
+  windSpeed: number,
+  site: LaunchSite
+): { xcPotential: 'high' | 'moderate' | 'low', xcReason: string } => {
+  const ceilingAGL = topOfLift - site.elevation;
+
+  // Soaring sites don't really do XC in the traditional sense
+  if (site.siteType === 'soaring') {
+    return { xcPotential: 'low', xcReason: 'Ridge site - local soaring' };
+  }
+
+  // High XC potential: strong thermals, high ceiling, manageable wind
+  if (thermalStrength >= 7 && ceilingAGL >= 4000 && windSpeed <= 15) {
+    return { xcPotential: 'high', xcReason: `${Math.round(ceilingAGL/1000)}k+ AGL, ${thermalStrength}/10` };
+  }
+
+  // Moderate: decent thermals or good ceiling
+  if ((thermalStrength >= 5 && ceilingAGL >= 3000) ||
+      (thermalStrength >= 6 && windSpeed <= 12)) {
+    return { xcPotential: 'moderate', xcReason: 'Good for local XC' };
+  }
+
+  // Low: limited ceiling or weak thermals
+  return { xcPotential: 'low', xcReason: ceilingAGL < 2000 ? 'Low ceiling' : 'Weak thermals' };
+};
+
+const extractHourlyData = (
+  site: LaunchSite,
+  hourly: any,
+  targetDate: string
+): HourlyDataPoint[] => {
+  const result: HourlyDataPoint[] = [];
+
+  hourly.time.forEach((time: string, index: number) => {
+    const dt = new Date(time);
+    const dateStr = dt.toISOString().split('T')[0];
+    const hour = dt.getHours();
+
+    // Only include 6am to 6pm (hours 6-18)
+    if (dateStr === targetDate && hour >= 6 && hour <= 18) {
+      const temp = hourly.temperature_2m[index];
+      const dewPoint = hourly.dew_point_2m[index];
+      const { tcon } = calculateLCL(temp, dewPoint, site.elevation);
+
+      result.push({
+        hour,
+        temperature: Math.round(temp),
+        tcon,
+        windSpeed: Math.round(hourly.wind_speed_10m[index]),
+        windDirection: hourly.wind_direction_10m[index],
+        windGust: Math.round(hourly.wind_gusts_10m[index]),
+        cloudCover: Math.round(hourly.cloud_cover[index])
+      });
+    }
+  });
+
+  return result;
 };
 
 const calculateThermalStrength = (
@@ -571,6 +642,7 @@ const checkWindDirectionMatch = (windDir: number, siteOrientation: string): bool
     'E': [[75, 105]],
     'SE': [[105, 165]],
     'S': [[165, 195]],
+    'SSW': [[180, 225]],  // For Sylmar/Kagel
     'SW': [[195, 255]],
     'W': [[255, 285]],
     'NW': [[285, 345]],
@@ -588,6 +660,121 @@ const checkWindDirectionMatch = (windDir: number, siteOrientation: string): bool
   return ranges.some(([min, max]) => windDir >= min && windDir <= max);
 };
 
+// Score an hour for thermal flying potential
+const scoreThermalHour = (
+  temp: number,
+  tcon: number,
+  windSpeed: number,
+  windGust: number,
+  cloudCover: number,
+  maxWind: number
+): number => {
+  let score = 0;
+
+  // Temperature vs TCON (thermals triggered when temp >= tcon)
+  const tempDeficit = tcon - temp;
+  if (tempDeficit <= 0) score += 40;  // Thermals are triggering
+  else if (tempDeficit <= 3) score += 30;
+  else if (tempDeficit <= 5) score += 20;
+  else if (tempDeficit <= 8) score += 10;
+
+  // Wind - moderate is best for thermals
+  if (windSpeed >= 5 && windSpeed <= 12) score += 25;
+  else if (windSpeed >= 3 && windSpeed <= 15) score += 15;
+  else if (windSpeed > maxWind) score -= 20;
+
+  // Gusts penalty
+  if (windGust > maxWind) score -= 15;
+  else if (windGust > windSpeed * 1.5) score -= 10;
+
+  // Cloud cover - some clouds indicate thermal activity, too much blocks sun
+  if (cloudCover >= 20 && cloudCover <= 50) score += 15;  // Cu development
+  else if (cloudCover < 20) score += 10;  // Clear but maybe blue thermals
+  else if (cloudCover > 70) score -= 10;  // Too overcast
+
+  return score;
+};
+
+// Score an hour for soaring (ridge lift) potential
+const scoreSoaringHour = (
+  windSpeed: number,
+  windGust: number,
+  windDirection: number,
+  siteOrientation: string,
+  maxWind: number
+): number => {
+  let score = 0;
+
+  // Wind direction match is critical for ridge soaring
+  const dirMatch = checkWindDirectionMatch(windDirection, siteOrientation);
+  if (!dirMatch) return -50;  // Wrong direction = no ridge lift
+
+  // Ideal soaring wind: 10-18 mph
+  if (windSpeed >= 10 && windSpeed <= 16) score += 40;
+  else if (windSpeed >= 8 && windSpeed <= 20) score += 25;
+  else if (windSpeed >= 6 && windSpeed <= 22) score += 10;
+  else if (windSpeed < 6) score -= 10;  // Too light
+  else if (windSpeed > maxWind) score -= 30;  // Too strong
+
+  // Gusts penalty
+  if (windGust > maxWind) score -= 20;
+  else if (windGust > 25) score -= 10;
+
+  return score;
+};
+
+const calculateLaunchTimeFromHourly = (
+  hourlyData: HourlyDataPoint[],
+  site: LaunchSite,
+  siteOrientation: string
+): string => {
+  if (!hourlyData || hourlyData.length === 0) {
+    return '12:00 PM';  // Fallback
+  }
+
+  // Filter to flyable hours (10am - 6pm for launch consideration)
+  const flyableHours = hourlyData.filter(h => h.hour >= 10 && h.hour <= 18);
+
+  if (flyableHours.length === 0) {
+    return '12:00 PM';
+  }
+
+  // Score each hour based on site type
+  const scoredHours = flyableHours.map(h => {
+    let score = 0;
+
+    if (site.siteType === 'soaring') {
+      // Pure soaring site - only care about ridge lift conditions
+      score = scoreSoaringHour(h.windSpeed, h.windGust, h.windDirection, siteOrientation, site.maxWind);
+    } else if (site.siteType === 'thermal') {
+      // Pure thermal site - prioritize thermal conditions
+      score = scoreThermalHour(h.temperature, h.tcon, h.windSpeed, h.windGust, h.cloudCover, site.maxWind);
+    } else {
+      // Mixed site - consider both, weight toward better option
+      const thermalScore = scoreThermalHour(h.temperature, h.tcon, h.windSpeed, h.windGust, h.cloudCover, site.maxWind);
+      const soaringScore = scoreSoaringHour(h.windSpeed, h.windGust, h.windDirection, siteOrientation, site.maxWind);
+      score = Math.max(thermalScore, soaringScore);
+    }
+
+    return { hour: h.hour, score };
+  });
+
+  // Find the best hour
+  const bestHour = scoredHours.reduce((best, current) =>
+    current.score > best.score ? current : best
+  );
+
+  // Format the hour
+  const formatHour = (hour: number): string => {
+    if (hour === 12) return '12:00 PM';
+    if (hour > 12) return `${hour - 12}:00 PM`;
+    return `${hour}:00 AM`;
+  };
+
+  return formatHour(bestHour.hour);
+};
+
+// Legacy function kept for fallback when no hourly data
 const calculateLaunchTime = (
   thermalFlyability: 'good' | 'marginal' | 'poor',
   soaringFlyability: 'good' | 'marginal' | 'poor',
@@ -799,6 +986,8 @@ export const getWeatherForecast = async (): Promise<SiteForecast[]> => {
           soaringFlyability: 'poor' as const,
           thermalFlyability: 'poor' as const,
           launchTime: '12:00 PM',
+          xcPotential: 'low' as const,
+          xcReason: 'No data',
           cape: 0,
           liftedIndex: 0,
           convergence: 0,

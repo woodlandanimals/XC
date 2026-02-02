@@ -46,12 +46,27 @@ function App() {
     });
   }, [forecasts]);
 
+  // Sort by TOMORROW's conditions (not today's)
+  const tomorrowsSorted = useMemo(() => {
+    return [...forecasts].sort((a, b) => {
+      const scoreMap: Record<string, number> = { good: 3, marginal: 2, poor: 1 };
+      const getScore = (f: SiteForecast) => {
+        const day2 = f.forecast[1];
+        if (!day2) return 0;
+        const soaring = scoreMap[day2.soaringFlyability];
+        const thermal = scoreMap[day2.thermalFlyability];
+        return Math.max(soaring, thermal);
+      };
+      return getScore(b) - getScore(a);
+    });
+  }, [forecasts]);
+
   // Get the single best site for today
   const todaysBest = sortedForecasts.length > 0 ? [sortedForecasts[0]] : [];
 
-  // Get the single best site for tomorrow
-  const tomorrowsBest = sortedForecasts.length > 0 && sortedForecasts[0].forecast.length > 1
-    ? [sortedForecasts[0]]
+  // Get the single best site for tomorrow (based on tomorrow's conditions)
+  const tomorrowsBest = tomorrowsSorted.length > 0 && tomorrowsSorted[0].forecast.length > 1
+    ? [tomorrowsSorted[0]]
     : [];
 
   // Remaining sites (all other sites)

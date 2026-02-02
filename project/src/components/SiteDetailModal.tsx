@@ -1,7 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { SiteForecast } from '../types/weather';
 import { getWindDirection } from '../services/weatherService';
-import { X } from 'lucide-react';
+import { X, ChevronDown, ChevronUp } from 'lucide-react';
+import HourlyChart from './HourlyChart';
+import WindArrow from './WindArrow';
 
 interface SiteDetailModalProps {
   siteForecast: SiteForecast;
@@ -10,6 +12,7 @@ interface SiteDetailModalProps {
 
 const SiteDetailModal: React.FC<SiteDetailModalProps> = ({ siteForecast, onClose }) => {
   const { site, forecast } = siteForecast;
+  const [expandedDay, setExpandedDay] = useState<string | null>(null);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -131,7 +134,10 @@ const SiteDetailModal: React.FC<SiteDetailModalProps> = ({ siteForecast, onClose
                 {/* Wind */}
                 <div className="bg-white p-3 border border-neutral-200">
                   <div className="data-label">Wind</div>
-                  <div className="data-value">{day.windSpeed}</div>
+                  <div className="data-value flex items-center gap-1">
+                    <WindArrow direction={day.windDirection} size={18} className="text-neutral-700" />
+                    {day.windSpeed}
+                  </div>
                   <div className="font-mono text-[10px] text-neutral-500">
                     {getWindDirection(day.windDirection)} G{day.windGust}
                   </div>
@@ -199,6 +205,47 @@ const SiteDetailModal: React.FC<SiteDetailModalProps> = ({ siteForecast, onClose
                   </div>
                 </div>
               </div>
+
+              {/* Hourly breakdown (expandable) */}
+              {day.hourlyData && day.hourlyData.length > 0 && (
+                <div className="mt-4 pt-4 border-t border-neutral-200">
+                  <button
+                    onClick={() => setExpandedDay(expandedDay === day.date ? null : day.date)}
+                    className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-wider text-neutral-500 hover:text-neutral-900 transition-colors"
+                  >
+                    {expandedDay === day.date ? (
+                      <ChevronUp className="w-3 h-3" />
+                    ) : (
+                      <ChevronDown className="w-3 h-3" />
+                    )}
+                    Hourly Breakdown
+                  </button>
+                  {expandedDay === day.date && (
+                    <div className="mt-3 bg-white border border-neutral-200 p-4">
+                      <HourlyChart
+                        hourlyData={day.hourlyData}
+                        siteElevation={site.elevation}
+                        maxWind={site.maxWind}
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* XC Potential indicator */}
+              {day.xcPotential && day.xcPotential !== 'low' && (
+                <div className="mt-4 pt-4 border-t border-neutral-200">
+                  <div className={`inline-flex items-center gap-2 px-3 py-2
+                    ${day.xcPotential === 'high' ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'}`}>
+                    <span className="font-mono text-[10px] uppercase tracking-wider font-bold">
+                      XC: {day.xcPotential}
+                    </span>
+                    {day.xcReason && (
+                      <span className="font-mono text-[10px]">— {day.xcReason}</span>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {/* Upper winds if available */}
               {(day.wind850mb || day.wind700mb) && (

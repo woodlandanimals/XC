@@ -1,3 +1,5 @@
+export type SiteType = 'thermal' | 'soaring' | 'mixed';
+
 export interface LaunchSite {
   id: string;
   name: string;
@@ -6,6 +8,17 @@ export interface LaunchSite {
   longitude: number;
   orientation: string;
   maxWind: number;
+  siteType: SiteType;
+}
+
+export interface HourlyDataPoint {
+  hour: number;           // 6-18
+  temperature: number;
+  tcon: number;
+  windSpeed: number;
+  windDirection: number;
+  windGust: number;
+  cloudCover: number;
 }
 
 export interface WeatherCondition {
@@ -24,6 +37,13 @@ export interface WeatherCondition {
   soaringFlyability: 'good' | 'marginal' | 'poor';
   thermalFlyability: 'good' | 'marginal' | 'poor';
   launchTime: string;
+
+  // XC potential
+  xcPotential: 'high' | 'moderate' | 'low';
+  xcReason?: string;
+
+  // Hourly breakdown
+  hourlyData?: HourlyDataPoint[];
 
   wind850mb?: number;
   windDir850mb?: number;

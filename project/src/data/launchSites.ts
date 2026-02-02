@@ -8,7 +8,8 @@ export const launchSites: LaunchSite[] = [
     latitude: 37.0331,
     longitude: -119.3372,
     orientation: 'SW-W',
-    maxWind: 18
+    maxWind: 18,
+    siteType: 'thermal'  // Central Valley thermal site
   },
   {
     id: 'ed-levin',
@@ -17,7 +18,8 @@ export const launchSites: LaunchSite[] = [
     latitude: 37.4656,
     longitude: -121.8531,
     orientation: 'SW-NW',
-    maxWind: 20
+    maxWind: 20,
+    siteType: 'mixed'  // Training hill + thermals
   },
   {
     id: 'mt-vaca',
@@ -26,7 +28,8 @@ export const launchSites: LaunchSite[] = [
     latitude: 38.3700,
     longitude: -122.0200,
     orientation: 'SW-W',
-    maxWind: 22
+    maxWind: 22,
+    siteType: 'mixed'  // Both ridge and thermal
   },
   {
     id: 'slide',
@@ -35,7 +38,8 @@ export const launchSites: LaunchSite[] = [
     latitude: 39.2900,
     longitude: -119.9400,
     orientation: 'W-NW',
-    maxWind: 25
+    maxWind: 25,
+    siteType: 'thermal'  // High altitude thermal
   },
   {
     id: 'whaleback',
@@ -44,7 +48,8 @@ export const launchSites: LaunchSite[] = [
     latitude: 36.7500,
     longitude: -121.8000,
     orientation: 'W-NW',
-    maxWind: 20
+    maxWind: 20,
+    siteType: 'mixed'  // Coastal influence + thermals
   },
   {
     id: 'blue-rock',
@@ -53,7 +58,8 @@ export const launchSites: LaunchSite[] = [
     latitude: 37.2500,
     longitude: -122.1800,
     orientation: 'W-NW',
-    maxWind: 18
+    maxWind: 18,
+    siteType: 'mixed'  // Ridge + thermal
   },
   {
     id: 'mt-diablo',
@@ -62,7 +68,8 @@ export const launchSites: LaunchSite[] = [
     latitude: 37.8814,
     longitude: -121.9142,
     orientation: 'W-SW',
-    maxWind: 20
+    maxWind: 20,
+    siteType: 'thermal'  // Strong thermal generator
   },
   {
     id: 'mission-peak',
@@ -71,7 +78,8 @@ export const launchSites: LaunchSite[] = [
     latitude: 37.5133,
     longitude: -121.8808,
     orientation: 'W-NW',
-    maxWind: 22
+    maxWind: 22,
+    siteType: 'mixed'  // Ridge + thermal
   },
   {
     id: 'potato-hill',
@@ -80,7 +88,8 @@ export const launchSites: LaunchSite[] = [
     latitude: 37.3500,
     longitude: -121.7500,
     orientation: 'W-NW',
-    maxWind: 18
+    maxWind: 18,
+    siteType: 'mixed'  // Training site, both modes
   },
   {
     id: 'mt-tamalpais',
@@ -89,7 +98,8 @@ export const launchSites: LaunchSite[] = [
     latitude: 37.9236,
     longitude: -122.5969,
     orientation: 'W-SW',
-    maxWind: 25
+    maxWind: 25,
+    siteType: 'soaring'  // Coastal ridge soaring
   },
   {
     id: 'dunlap',
@@ -98,7 +108,8 @@ export const launchSites: LaunchSite[] = [
     latitude: 36.7400,
     longitude: -119.1000,
     orientation: 'SW-W',
-    maxWind: 20
+    maxWind: 20,
+    siteType: 'thermal'  // Famous XC thermal site
   },
   {
     id: 'mcgee',
@@ -107,7 +118,8 @@ export const launchSites: LaunchSite[] = [
     latitude: 37.5800,
     longitude: -118.8300,
     orientation: 'E-SE',
-    maxWind: 22
+    maxWind: 22,
+    siteType: 'thermal'  // High Sierra thermal
   },
   {
     id: 'mussel-rock',
@@ -116,7 +128,8 @@ export const launchSites: LaunchSite[] = [
     latitude: 37.6600,
     longitude: -122.4900,
     orientation: 'W-NW',
-    maxWind: 25
+    maxWind: 25,
+    siteType: 'soaring'  // Coastal ridge only
   },
   {
     id: 'ej-bowl',
@@ -125,6 +138,7 @@ export const launchSites: LaunchSite[] = [
     latitude: 34.4042,
     longitude: -119.7465,
     orientation: 'W-NW',
-    maxWind: 22
+    maxWind: 22,
+    siteType: 'soaring'  // Coastal ridge soaring
   }
 ];
