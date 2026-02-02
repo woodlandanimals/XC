@@ -140,5 +140,65 @@ export const launchSites: LaunchSite[] = [
     orientation: 'W-NW',
     maxWind: 22,
     siteType: 'soaring'  // Coastal ridge soaring
+  },
+  {
+    id: 'big-sur',
+    name: 'Big Sur',
+    elevation: 3240,
+    latitude: 35.9703,
+    longitude: -121.4511,
+    orientation: 'W-NW',
+    maxWind: 15,
+    siteType: 'soaring'  // Coastal ridge soaring
+  },
+  {
+    id: 'sand-city',
+    name: 'Sand City',
+    elevation: 50,
+    latitude: 36.6252,
+    longitude: -121.8439,
+    orientation: 'W-NW',
+    maxWind: 18,
+    siteType: 'soaring'  // Coastal dune soaring
+  },
+  {
+    id: 'goat-rock',
+    name: 'Goat Rock',
+    elevation: 160,
+    latitude: 38.4467,
+    longitude: -123.1264,
+    orientation: 'W-NW',
+    maxWind: 18,
+    siteType: 'soaring'  // Coastal cliff soaring
+  },
+  {
+    id: 'channing-east',
+    name: 'Channing East',
+    elevation: 200,
+    latitude: 38.0686,
+    longitude: -122.1472,
+    orientation: 'E-SE',
+    maxWind: 12,
+    siteType: 'mixed'  // Ridge + thermal
+  },
+  {
+    id: 'paiute',
+    name: 'Paiute',
+    elevation: 8000,
+    latitude: 37.4100,
+    longitude: -118.2700,
+    orientation: 'SW-NW',
+    maxWind: 15,
+    siteType: 'thermal'  // White Mountains thermal
+  },
+  {
+    id: 'flynns',
+    name: 'Flynns',
+    elevation: 5600,
+    latitude: 37.3884,
+    longitude: -118.2950,
+    orientation: 'W-NW',
+    maxWind: 15,
+    siteType: 'thermal'  // Owens Valley thermal
   }
 ];
