@@ -90,7 +90,7 @@ const WeeklyView: React.FC<WeeklyViewProps> = ({ forecasts }) => {
                   if (forecast.windSpeed > siteForecast.site.maxWind || forecast.windGust > siteForecast.site.maxWind * 1.25) return 'Strong';
                   if (forecast.soaringFlyability === 'good') return 'Good';
                   if (forecast.soaringFlyability === 'marginal') return 'Wind OK';
-                  if (forecast.windSpeed < 6) return 'Light';
+                  if (forecast.windSpeed < 8) return 'Light';
                   return 'Wind OK';
                 };
 

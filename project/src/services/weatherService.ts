@@ -834,16 +834,14 @@ const determineSoaringFlyability = (
   if (!windDirectionMatch) return 'poor';
 
   // Use site-specific max wind limits
-  if (windSpeed < 6) return 'poor';
+  if (windSpeed < 8) return 'poor';
   if (windSpeed > site.maxWind) return 'poor';
   if (windGust > site.maxWind * 1.25) return 'poor';
 
   // Good soaring: 10-16 mph with reasonable gusts
   if (windSpeed >= 10 && windSpeed <= 16 && windGust <= site.maxWind) return 'good';
-  // Also good: 8-18 mph if within site limits
+  // Also good: 8+ mph if within site limits
   if (windSpeed >= 8 && windSpeed <= site.maxWind && windGust <= site.maxWind) return 'good';
-  // Marginal soaring: 6-8 mph or higher gusts
-  if (windSpeed >= 6 && windSpeed <= site.maxWind && windGust <= site.maxWind * 1.1) return 'marginal';
 
   return 'poor';
 };
