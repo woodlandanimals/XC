@@ -1,5 +1,6 @@
 import React from 'react';
 import { SiteForecast } from '../types/weather';
+import WindArrow from './WindArrow';
 
 interface WeeklyViewProps {
   forecasts: SiteForecast[];
@@ -105,8 +106,9 @@ const WeeklyView: React.FC<WeeklyViewProps> = ({ forecasts }) => {
                             {getFlyabilityLabel(forecast.thermalFlyability)}
                           </span>
                         </div>
-                        <div className="text-[10px] text-neutral-600 mt-2">
-                          {forecast.windSpeed}-{forecast.windGust} mph
+                        <div className="text-[10px] text-neutral-600 mt-2 flex items-center gap-1">
+                          <WindArrow direction={forecast.windDirection} size={12} className="text-neutral-600" />
+                          {forecast.windSpeed}-{forecast.windGust}
                         </div>
                         <div className="text-[10px] text-neutral-500">
                           {forecast.launchTime}

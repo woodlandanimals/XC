@@ -649,6 +649,7 @@ const checkWindDirectionMatch = (windDir: number, siteOrientation: string): bool
     'SW-W': [[195, 285]],
     'W-NW': [[245, 345]],
     'SW-NW': [[195, 345]],
+    'S-NW': [[165, 345]],  // For Ed Levin - wide range from S through W to NW
     'W-SW': [[225, 285]],
     'E-SE': [[75, 165]],
     'NW-N': [[315, 360], [0, 15]]
@@ -831,12 +832,17 @@ const determineSoaringFlyability = (
 ): 'good' | 'marginal' | 'poor' => {
   if (!windDirectionMatch) return 'poor';
 
-  if (windSpeed < 8) return 'poor';
-  if (windSpeed > 20) return 'poor';
-  if (windGust > 20) return 'poor';
+  // Use site-specific max wind limits
+  if (windSpeed < 6) return 'poor';
+  if (windSpeed > site.maxWind) return 'poor';
+  if (windGust > site.maxWind * 1.25) return 'poor';
 
-  if (windSpeed >= 10 && windSpeed <= 14 && windGust <= 20) return 'good';
-  if (windSpeed >= 8 && windSpeed <= 20 && windGust <= 20) return 'marginal';
+  // Good soaring: 10-16 mph with reasonable gusts
+  if (windSpeed >= 10 && windSpeed <= 16 && windGust <= site.maxWind) return 'good';
+  // Also good: 8-18 mph if within site limits
+  if (windSpeed >= 8 && windSpeed <= site.maxWind && windGust <= site.maxWind) return 'good';
+  // Marginal soaring: 6-8 mph or higher gusts
+  if (windSpeed >= 6 && windSpeed <= site.maxWind && windGust <= site.maxWind * 1.1) return 'marginal';
 
   return 'poor';
 };

@@ -83,16 +83,17 @@ function App() {
       />
 
       <main className="max-w-6xl mx-auto px-4 py-6">
-        {loading && forecasts.length === 0 ? (
+        {loading && forecasts.length === 0 && (
           <div className="flex items-center justify-center py-20">
             <div className="text-center">
               <div className="w-8 h-8 border-2 border-neutral-900 border-t-transparent animate-spin mx-auto mb-4" />
               <p className="font-mono text-sm text-neutral-500">Loading forecast data...</p>
             </div>
           </div>
-        ) : view === 'weekly' ? (
+        )}
+        {forecasts.length > 0 && view === 'weekly' ? (
           <WeeklyView forecasts={sortedForecasts} />
-        ) : (
+        ) : forecasts.length > 0 ? (
           <div className="space-y-8">
             {/* Today's Best - most prominent */}
             {todaysBest.length > 0 && (
@@ -170,7 +171,7 @@ function App() {
               </p>
             </footer>
           </div>
-        )}
+        ) : null}
       </main>
 
       {selectedSite && (
