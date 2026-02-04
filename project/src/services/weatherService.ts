@@ -41,6 +41,7 @@ const fetchHRRRData = async (site: LaunchSite) => {
         'wind_gusts_10m',
         'cape',
         'lifted_index',
+        'boundary_layer_height',
         'precipitation',
         'precipitation_probability'
       ].join(','),
@@ -170,18 +171,33 @@ const processECMWFDataForDay = (site: LaunchSite, data: any, targetDate: string)
       return Math.abs(currentHour - 12) < Math.abs(closestHour - 12) ? current : closest;
     });
 
-    const temperature = hourly.temperature_2m[noonIndex];
-    const dewPoint = hourly.dew_point_2m[noonIndex];
-    const windSpeed = Math.round(hourly.wind_speed_10m[noonIndex]);
-    const windDirection = hourly.wind_direction_10m[noonIndex];
-    const windGust = Math.round(hourly.wind_gusts_10m[noonIndex]);
-    const relativeHumidity = hourly.relative_humidity_2m[noonIndex];
-    const cloudCover = hourly.cloud_cover[noonIndex];
+    // Extract hourly data early so we can find best flyable hour
+    const hourlyData = extractHourlyData(site, hourly, targetDate);
 
-    // ECMWF doesn't provide CAPE and lifted index, so we estimate
+    // Start with noon values as defaults
+    let temperature = hourly.temperature_2m[noonIndex];
+    const dewPoint = hourly.dew_point_2m[noonIndex];
+    let windSpeed = Math.round(hourly.wind_speed_10m[noonIndex]);
+    let windDirection = hourly.wind_direction_10m[noonIndex];
+    let windGust = Math.round(hourly.wind_gusts_10m[noonIndex]);
+    const relativeHumidity = hourly.relative_humidity_2m[noonIndex];
+    let cloudCover = hourly.cloud_cover[noonIndex];
+
+    // Find best flyable hour and use its values if conditions are good
+    const bestHour = findBestFlyableHour(hourlyData, site, site.orientation);
+    if (bestHour && bestHour.score > 0) {
+      windSpeed = bestHour.data.windSpeed;
+      windGust = bestHour.data.windGust;
+      windDirection = bestHour.data.windDirection;
+      temperature = bestHour.data.temperature;
+      cloudCover = bestHour.data.cloudCover;
+    }
+
+    // ECMWF doesn't provide CAPE, lifted index, or boundary layer height
+    // So we use defaults that will trigger the stability-based fallback
     const cape = 0;
     const liftedIndex = 0;
-    const blDepth = undefined;
+    const boundaryLayerHeight = undefined;
 
     const { lclMSL, tcon } = calculateLCL(temperature, dewPoint, site.elevation);
 
@@ -192,15 +208,19 @@ const processECMWFDataForDay = (site: LaunchSite, data: any, targetDate: string)
       site.elevation,
       cape,
       liftedIndex,
-      blDepth
+      boundaryLayerHeight
     );
 
-    let topOfLift = calculateTopOfLift(
+    let topOfLift = calculateTopOfUsableLift(
       lclMSL,
       thermalStrength,
       windSpeed,
       site.elevation,
-      blDepth
+      cape,
+      liftedIndex,
+      boundaryLayerHeight,
+      temperature,
+      dewPoint
     );
 
     const windDirectionMatch = checkWindDirectionMatch(windDirection, site.orientation);
@@ -232,9 +252,6 @@ const processECMWFDataForDay = (site: LaunchSite, data: any, targetDate: string)
 
     const rainInfo = analyzeRain(hourly, targetDate);
 
-    // Extract hourly data first so we can use it for launch time calculation
-    const hourlyData = extractHourlyData(site, hourly, targetDate);
-
     // Calculate launch time using hourly data for better accuracy
     const launchTime = hourlyData.length > 0
       ? calculateLaunchTimeFromHourly(hourlyData, site, site.orientation)
@@ -265,7 +282,7 @@ const processECMWFDataForDay = (site: LaunchSite, data: any, targetDate: string)
       windDir850mb: undefined,
       wind700mb: undefined,
       windDir700mb: undefined,
-      blDepth,
+      blDepth: boundaryLayerHeight,
       cape: Math.round(cape),
       liftedIndex: Math.round(liftedIndex * 10) / 10,
       convergence: 0,
@@ -310,13 +327,27 @@ const processHRRRDataForDay = (site: LaunchSite, data: any, targetDate: string):
       return Math.abs(currentHour - 12) < Math.abs(closestHour - 12) ? current : closest;
     });
 
-    const temperature = hourly.temperature_2m[noonIndex];
+    // Extract hourly data early so we can find best flyable hour
+    const hourlyData = extractHourlyData(site, hourly, targetDate);
+
+    // Start with noon values as defaults
+    let temperature = hourly.temperature_2m[noonIndex];
     const dewPoint = hourly.dew_point_2m[noonIndex];
-    const windSpeed = Math.round(hourly.wind_speed_10m[noonIndex]);
-    const windDirection = hourly.wind_direction_10m[noonIndex];
-    const windGust = Math.round(hourly.wind_gusts_10m[noonIndex]);
+    let windSpeed = Math.round(hourly.wind_speed_10m[noonIndex]);
+    let windDirection = hourly.wind_direction_10m[noonIndex];
+    let windGust = Math.round(hourly.wind_gusts_10m[noonIndex]);
     const relativeHumidity = hourly.relative_humidity_2m[noonIndex];
-    const cloudCover = hourly.cloud_cover[noonIndex];
+    let cloudCover = hourly.cloud_cover[noonIndex];
+
+    // Find best flyable hour and use its values if conditions are good
+    const bestHour = findBestFlyableHour(hourlyData, site, site.orientation);
+    if (bestHour && bestHour.score > 0) {
+      windSpeed = bestHour.data.windSpeed;
+      windGust = bestHour.data.windGust;
+      windDirection = bestHour.data.windDirection;
+      temperature = bestHour.data.temperature;
+      cloudCover = bestHour.data.cloudCover;
+    }
 
     const wind850mb = undefined;
     const windDir850mb = undefined;
@@ -325,7 +356,7 @@ const processHRRRDataForDay = (site: LaunchSite, data: any, targetDate: string):
 
     const cape = hourly.cape?.[noonIndex] || 0;
     const liftedIndex = hourly.lifted_index?.[noonIndex] || 0;
-    const blDepth = undefined;
+    const boundaryLayerHeight = hourly.boundary_layer_height?.[noonIndex] || undefined;
 
     const { lclMSL, tcon } = calculateLCL(temperature, dewPoint, site.elevation);
 
@@ -336,15 +367,19 @@ const processHRRRDataForDay = (site: LaunchSite, data: any, targetDate: string):
       site.elevation,
       cape,
       liftedIndex,
-      blDepth
+      boundaryLayerHeight
     );
 
-    let topOfLift = calculateTopOfLift(
+    let topOfLift = calculateTopOfUsableLift(
       lclMSL,
       thermalStrength,
       windSpeed,
       site.elevation,
-      blDepth
+      cape,
+      liftedIndex,
+      boundaryLayerHeight,
+      temperature,
+      dewPoint
     );
 
     const windDirectionMatch = checkWindDirectionMatch(windDirection, site.orientation);
@@ -376,9 +411,6 @@ const processHRRRDataForDay = (site: LaunchSite, data: any, targetDate: string):
 
     const rainInfo = analyzeRain(hourly, targetDate);
 
-    // Extract hourly data first so we can use it for launch time calculation
-    const hourlyData = extractHourlyData(site, hourly, targetDate);
-
     // Calculate launch time using hourly data for better accuracy
     const launchTime = hourlyData.length > 0
       ? calculateLaunchTimeFromHourly(hourlyData, site, site.orientation)
@@ -409,7 +441,7 @@ const processHRRRDataForDay = (site: LaunchSite, data: any, targetDate: string):
       windDir850mb,
       wind700mb: wind700mb ? Math.round(wind700mb) : undefined,
       windDir700mb,
-      blDepth,
+      blDepth: boundaryLayerHeight,
       cape: Math.round(cape),
       liftedIndex: Math.round(liftedIndex * 10) / 10,
       convergence: 0,
@@ -556,36 +588,82 @@ const calculateThermalStrength = (
   return Math.max(0, Math.min(10, Math.round(strength * 10) / 10));
 };
 
-const calculateTopOfLift = (
+// Estimate environmental lapse rate from atmospheric stability indicators
+const estimateEnvLapseRate = (cape: number, liftedIndex: number): number => {
+  // Returns environmental lapse rate in °F per 1000 ft
+  // DALR is 5.4°F/1000ft - stable atmosphere has lower lapse rate
+  if (liftedIndex < -4 && cape > 1000) return 5.0;  // Very unstable
+  if (liftedIndex < -2 && cape > 500) return 4.5;   // Unstable
+  if (liftedIndex < 0 && cape > 200) return 4.0;    // Slightly unstable
+  if (liftedIndex < 2) return 3.5;                  // Neutral (typical Bay Area)
+  if (liftedIndex < 4) return 3.0;                  // Stable
+  return 2.5;                                        // Very stable (inversion)
+};
+
+// Apply wind reduction to top of lift - wind shear disrupts thermals
+const applyWindReduction = (topOfLift: number, windSpeed: number, elevationFt: number): number => {
+  let reduced = topOfLift;
+  if (windSpeed > 20) reduced -= 1000;
+  else if (windSpeed > 15) reduced -= 600;
+  else if (windSpeed > 10) reduced -= 300;
+  return Math.max(elevationFt + 500, Math.round(reduced));
+};
+
+// Calculate top of usable lift using thermal equilibrium approach
+// This finds where thermals dissipate, not just where clouds form (LCL)
+const calculateTopOfUsableLift = (
   lclMSL: number,
   thermalStrength: number,
   windSpeed: number,
   elevationFt: number,
-  blDepth?: number
+  cape: number,
+  liftedIndex: number,
+  boundaryLayerHeight?: number,  // meters from API
+  temperature?: number,
+  dewPoint?: number
 ): number => {
-  let topOfLift = lclMSL;
+  const DALR = 5.4;  // degrees F per 1000 ft
+  const GLIDER_SINK_ADJ = 500;  // practical reduction for glider sink rate
 
-  if (blDepth) {
-    topOfLift = Math.max(topOfLift, elevationFt + blDepth * 0.9);
+  // Method 1: Use boundary layer height directly (most accurate)
+  // BL height tells us how deep the convective mixing layer is
+  if (boundaryLayerHeight && boundaryLayerHeight > 100) {
+    const blHeightFt = boundaryLayerHeight * 3.28084;
+    let topOfLift = elevationFt + (blHeightFt * 0.85);
+    topOfLift = Math.min(topOfLift, lclMSL);  // Cap at cloud base
+    topOfLift -= GLIDER_SINK_ADJ;
+    return applyWindReduction(topOfLift, windSpeed, elevationFt);
   }
 
-  if (thermalStrength >= 7) {
-    topOfLift = lclMSL + 1000;
-  } else if (thermalStrength >= 5) {
-    topOfLift = lclMSL + 500;
-  } else if (thermalStrength >= 3) {
-    topOfLift = lclMSL - 500;
+  // Method 2: Estimate from atmospheric stability
+  // Calculate where rising parcel reaches thermal equilibrium
+  const envLapseRate = estimateEnvLapseRate(cape, liftedIndex);
+  const lapseRateDiff = DALR - envLapseRate;
+
+  let thermalAGL: number;
+  if (lapseRateDiff <= 0.3) {
+    // Near-adiabatic or unstable - thermals can go high
+    // Use temp-dewpoint spread as proxy for depth
+    const spread = (temperature && dewPoint) ? temperature - dewPoint : 20;
+    thermalAGL = Math.min(spread * 180, 6000);
   } else {
-    topOfLift = elevationFt + Math.max(500, (lclMSL - elevationFt) * 0.6);
+    // Stable atmosphere - calculate equilibrium height
+    // Estimate inversion strength based on lifted index
+    const inversionStrength = Math.max(5, liftedIndex * 2.5 + 10);
+    thermalAGL = Math.min((inversionStrength / lapseRateDiff) * 1000, 7000);
   }
 
-  if (windSpeed > 15) {
-    topOfLift = topOfLift - 800;
-  } else if (windSpeed > 10) {
-    topOfLift = topOfLift - 400;
+  let topOfLift = elevationFt + thermalAGL;
+  topOfLift = Math.min(topOfLift, lclMSL);  // Cap at LCL (can't exceed cloud base)
+  topOfLift -= GLIDER_SINK_ADJ;
+
+  // Weak thermals don't reach full potential height
+  if (thermalStrength < 5) {
+    const factor = 0.6 + (thermalStrength / 12.5);
+    topOfLift = elevationFt + (topOfLift - elevationFt) * factor;
   }
 
-  return Math.max(elevationFt + 500, topOfLift);
+  return applyWindReduction(topOfLift, windSpeed, elevationFt);
 };
 
 const analyzeRain = (hourly: any, targetDate: string): string | undefined => {
@@ -650,6 +728,7 @@ const checkWindDirectionMatch = (windDir: number, siteOrientation: string): bool
     'W-NW': [[245, 345]],
     'SW-NW': [[195, 345]],
     'S-NW': [[165, 345]],  // For Ed Levin - wide range from S through W to NW
+    'SSE-WNW': [[150, 300]],  // For Tollhouse - SSE through S, SW, W to WNW - thermals come up the hill
     'W-SW': [[225, 285]],
     'E-SE': [[75, 165]],
     'NE-SE': [[30, 165]],  // For Channing East - NE through E to SE
@@ -723,6 +802,39 @@ const scoreSoaringHour = (
   else if (windGust > 25) score -= 10;
 
   return score;
+};
+
+// Find the best flyable hour based on site type
+const findBestFlyableHour = (
+  hourlyData: HourlyDataPoint[],
+  site: LaunchSite,
+  orientation: string
+): { hour: number; score: number; data: HourlyDataPoint } | null => {
+  const flyableHours = hourlyData.filter(h => h.hour >= 10 && h.hour <= 18);
+  if (flyableHours.length === 0) return null;
+
+  let bestHour = flyableHours[0];
+  let bestScore = -Infinity;
+
+  for (const h of flyableHours) {
+    let score: number;
+    if (site.siteType === 'soaring') {
+      score = scoreSoaringHour(h.windSpeed, h.windGust, h.windDirection, orientation, site.maxWind);
+    } else if (site.siteType === 'thermal') {
+      score = scoreThermalHour(h.temperature, h.tcon, h.windSpeed, h.windGust, h.cloudCover, site.maxWind);
+    } else {
+      // Mixed: use whichever type has better conditions
+      const soaringScore = scoreSoaringHour(h.windSpeed, h.windGust, h.windDirection, orientation, site.maxWind);
+      const thermalScore = scoreThermalHour(h.temperature, h.tcon, h.windSpeed, h.windGust, h.cloudCover, site.maxWind);
+      score = Math.max(soaringScore, thermalScore);
+    }
+    if (score > bestScore) {
+      bestScore = score;
+      bestHour = h;
+    }
+  }
+
+  return { hour: bestHour.hour, score: bestScore, data: bestHour };
 };
 
 const calculateLaunchTimeFromHourly = (
@@ -931,7 +1043,34 @@ const determineFlyability = (
   return { flyability, conditions };
 };
 
+// Try to fetch pre-computed cached data first
+const fetchCachedForecast = async (): Promise<SiteForecast[] | null> => {
+  try {
+    const response = await fetch('/data/forecast.json');
+    if (response.ok) {
+      const cached = await response.json();
+      // Check if data is less than 2 hours old
+      const generated = new Date(cached.generated);
+      const age = Date.now() - generated.getTime();
+      if (age < 2 * 60 * 60 * 1000) {
+        console.log('Using cached forecast data from', cached.generated);
+        return cached.forecasts;
+      }
+      console.log('Cached data too old, fetching live');
+    }
+  } catch (e) {
+    console.log('Cached data not available, fetching live');
+  }
+  return null;
+};
+
 export const getWeatherForecast = async (): Promise<SiteForecast[]> => {
+  // Try cached data first to avoid API rate limits
+  const cachedForecasts = await fetchCachedForecast();
+  if (cachedForecasts) {
+    return cachedForecasts;
+  }
+
   const now = new Date();
 
   const getPacificDateString = (daysOffset: number = 0): string => {

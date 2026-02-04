@@ -7,9 +7,9 @@ export const launchSites: LaunchSite[] = [
     elevation: 4200,
     latitude: 37.0331,
     longitude: -119.3372,
-    orientation: 'SW-W',
-    maxWind: 18,
-    siteType: 'thermal'  // Central Valley thermal site
+    orientation: 'SSE-WNW',
+    maxWind: 17,
+    siteType: 'thermal'  // Central Valley thermal site - thermals come up the hill from wide range
   },
   {
     id: 'ed-levin',
