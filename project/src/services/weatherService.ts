@@ -1,4 +1,4 @@
-import { LaunchSite, WeatherCondition, SiteForecast, HourlyDataPoint } from '../types/weather';
+import { LaunchSite, WeatherCondition, SiteForecast, HourlyDataPoint, PressureLevelData, SoundingData } from '../types/weather';
 import { launchSites } from '../data/launchSites';
 
 const weatherCache = new Map<string, { data: any; timestamp: number }>();
@@ -6,6 +6,10 @@ const CACHE_DURATION = 60 * 60 * 1000;
 
 let lastApiCall = 0;
 const MIN_API_INTERVAL = 100;
+
+// Track whether we're using stale/fallback data
+let dataTimestamp: Date | null = null;
+let dataSource: 'live' | 'cached' | 'stale' = 'live';
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -1044,33 +1048,54 @@ const determineFlyability = (
 };
 
 // Try to fetch pre-computed cached data first
-const fetchCachedForecast = async (): Promise<SiteForecast[] | null> => {
+// Returns { forecasts, generated, isStale } or null if unavailable
+const fetchCachedForecast = async (): Promise<{
+  forecasts: SiteForecast[];
+  generated: Date;
+  isStale: boolean;
+} | null> => {
   try {
     const response = await fetch('/data/forecast.json');
     if (response.ok) {
       const cached = await response.json();
-      // Check if data is less than 2 hours old
       const generated = new Date(cached.generated);
       const age = Date.now() - generated.getTime();
-      if (age < 2 * 60 * 60 * 1000) {
+      const isStale = age >= 2 * 60 * 60 * 1000;
+      if (!isStale) {
         console.log('Using cached forecast data from', cached.generated);
-        return cached.forecasts;
+      } else {
+        console.log('Cached data is stale (age:', Math.round(age / 60000), 'min), available as fallback');
       }
-      console.log('Cached data too old, fetching live');
+      return { forecasts: cached.forecasts, generated, isStale };
     }
   } catch (e) {
-    console.log('Cached data not available, fetching live');
+    console.log('Cached data not available');
   }
   return null;
 };
 
-export const getWeatherForecast = async (): Promise<SiteForecast[]> => {
+export interface ForecastResult {
+  forecasts: SiteForecast[];
+  dataTimestamp: Date;
+  dataSource: 'live' | 'cached' | 'stale';
+}
+
+export const getWeatherForecast = async (): Promise<ForecastResult> => {
   // Try cached data first to avoid API rate limits
-  const cachedForecasts = await fetchCachedForecast();
-  if (cachedForecasts) {
-    return cachedForecasts;
+  const cachedResult = await fetchCachedForecast();
+
+  // If fresh cached data exists, use it directly
+  if (cachedResult && !cachedResult.isStale) {
+    dataTimestamp = cachedResult.generated;
+    dataSource = 'cached';
+    return {
+      forecasts: cachedResult.forecasts,
+      dataTimestamp: cachedResult.generated,
+      dataSource: 'cached'
+    };
   }
 
+  // Try live API (stale cache available as fallback)
   const now = new Date();
 
   const getPacificDateString = (daysOffset: number = 0): string => {
@@ -1092,11 +1117,16 @@ export const getWeatherForecast = async (): Promise<SiteForecast[]> => {
   const targetDates = Array.from({ length: 7 }, (_, i) => getPacificDateString(i));
 
   const forecasts: SiteForecast[] = [];
+  let anyHrrrFailed = false;
+  let anyApiFailed = false;
 
   for (const site of launchSites) {
     // Fetch HRRR data for days 0-1 and ECMWF data for days 0-6
     const hrrrData = await fetchHRRRData(site);
     const ecmwfData = await fetchECMWFData(site);
+
+    if (!hrrrData) anyHrrrFailed = true;
+    if (!hrrrData && !ecmwfData) anyApiFailed = true;
 
     const forecastData: WeatherCondition[] = [];
 
@@ -1105,9 +1135,12 @@ export const getWeatherForecast = async (): Promise<SiteForecast[]> => {
       let dayForecast: WeatherCondition | null = null;
 
       // Use HRRR for days 0-1, ECMWF for days 2-6
+      // Only fall through to ECMWF for days 0-1 if HRRR is truly null
       if (i <= 1 && hrrrData) {
         dayForecast = processHRRRDataForDay(site, hrrrData, targetDate);
-      } else if (ecmwfData) {
+      }
+      // For days 2-6, always use ECMWF. For days 0-1, only use ECMWF if HRRR failed
+      if (!dayForecast && ecmwfData) {
         dayForecast = processECMWFDataForDay(site, ecmwfData, targetDate);
       }
 
@@ -1148,7 +1181,205 @@ export const getWeatherForecast = async (): Promise<SiteForecast[]> => {
     });
   }
 
-  return forecasts;
+  // If HRRR failed for any site and we have stale cached data,
+  // prefer the stale cache (which has HRRR data) over ECMWF-only results
+  if (anyHrrrFailed && cachedResult) {
+    console.log('HRRR API failed, falling back to stale cached data (has HRRR)');
+    dataTimestamp = cachedResult.generated;
+    dataSource = 'stale';
+    return {
+      forecasts: cachedResult.forecasts,
+      dataTimestamp: cachedResult.generated,
+      dataSource: 'stale'
+    };
+  }
+
+  // If all APIs failed entirely and we have stale cache, use it
+  if (anyApiFailed && cachedResult) {
+    console.log('APIs unavailable, falling back to stale cached data');
+    dataTimestamp = cachedResult.generated;
+    dataSource = 'stale';
+    return {
+      forecasts: cachedResult.forecasts,
+      dataTimestamp: cachedResult.generated,
+      dataSource: 'stale'
+    };
+  }
+
+  dataTimestamp = now;
+  dataSource = 'live';
+  return {
+    forecasts,
+    dataTimestamp: now,
+    dataSource: 'live'
+  };
+};
+
+export const getDataStatus = () => ({
+  timestamp: dataTimestamp,
+  source: dataSource
+});
+
+const PRESSURE_LEVELS = [1000, 975, 950, 925, 900, 850, 800, 700, 600, 500];
+
+const fetchPressureLevelData = async (site: LaunchSite): Promise<any> => {
+  try {
+    const cacheKey = getCacheKey(site) + '-pressure';
+    const cached = weatherCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+      return cached.data;
+    }
+
+    const timeSinceLastCall = Date.now() - lastApiCall;
+    if (timeSinceLastCall < MIN_API_INTERVAL) {
+      await delay(MIN_API_INTERVAL - timeSinceLastCall);
+    }
+
+    lastApiCall = Date.now();
+
+    const pressureParams: string[] = [];
+    for (const level of PRESSURE_LEVELS) {
+      pressureParams.push(
+        `temperature_${level}hPa`,
+        `dew_point_${level}hPa`,
+        `wind_speed_${level}hPa`,
+        `wind_direction_${level}hPa`,
+        `geopotential_height_${level}hPa`
+      );
+    }
+
+    const params = new URLSearchParams({
+      latitude: site.latitude.toFixed(4),
+      longitude: site.longitude.toFixed(4),
+      hourly: pressureParams.join(','),
+      temperature_unit: 'fahrenheit',
+      wind_speed_unit: 'mph',
+      timezone: 'America/Los_Angeles',
+      forecast_days: '2'
+    });
+
+    const url = `https://api.open-meteo.com/v1/forecast?${params}`;
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      throw new Error(`Open-Meteo pressure level API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    weatherCache.set(cacheKey, { data, timestamp: Date.now() });
+    return data;
+  } catch (error) {
+    console.error(`Failed to fetch pressure level data for ${site.name}:`, error);
+    const cacheKey = getCacheKey(site) + '-pressure';
+    const cached = weatherCache.get(cacheKey);
+    if (cached) return cached.data;
+    return null;
+  }
+};
+
+const extractSoundingData = (
+  site: LaunchSite,
+  data: any,
+  targetDate: string,
+  targetHour: number
+): SoundingData | null => {
+  if (!data || !data.hourly) return null;
+
+  const hourly = data.hourly;
+  const targetIndex = hourly.time.findIndex((time: string) => {
+    const dt = new Date(time);
+    const dateStr = dt.toISOString().split('T')[0];
+    return dateStr === targetDate && dt.getHours() === targetHour;
+  });
+
+  if (targetIndex === -1) return null;
+
+  const levels: PressureLevelData[] = PRESSURE_LEVELS.map(pressure => ({
+    pressure,
+    temperature: hourly[`temperature_${pressure}hPa`]?.[targetIndex],
+    dewPoint: hourly[`dew_point_${pressure}hPa`]?.[targetIndex],
+    windSpeed: Math.round(hourly[`wind_speed_${pressure}hPa`]?.[targetIndex] || 0),
+    windDirection: hourly[`wind_direction_${pressure}hPa`]?.[targetIndex] || 0,
+    geopotentialHeight: hourly[`geopotential_height_${pressure}hPa`]?.[targetIndex] || 0,
+  })).filter(l => l.temperature != null && l.dewPoint != null);
+
+  return {
+    levels,
+    surfaceElevation: site.elevation,
+    hour: targetHour
+  };
+};
+
+// Generate realistic sounding data based on site location and hour
+// Used as fallback when API is unavailable (e.g. rate limited)
+const generateFallbackSounding = (
+  site: LaunchSite,
+  targetHour: number
+): SoundingData => {
+  const elevM = site.elevation / 3.28084;
+  // Standard atmosphere surface temp adjusted for hour and elevation
+  const hourFactor = targetHour >= 10 && targetHour <= 15 ? 1.0 : 0.85;
+  const surfaceTempC = (25 - elevM * 0.0065) * hourFactor;
+  const surfaceDewC = surfaceTempC - 12;
+
+  const levels: PressureLevelData[] = PRESSURE_LEVELS.map(pressure => {
+    // Standard atmosphere altitude for pressure level
+    const altM = 44330 * (1 - Math.pow(pressure / 1013.25, 0.1903));
+    const altFt = altM * 3.28084;
+
+    // Environmental lapse rate ~6.5°C/km with slight inversion around 850hPa
+    let tempC: number;
+    if (pressure >= 900) {
+      // Surface to ~1km: normal lapse
+      tempC = surfaceTempC - (altM - elevM) * 0.0065;
+    } else if (pressure >= 850 && pressure < 900) {
+      // Slight inversion/isothermal layer (common in Bay Area marine layer)
+      const baseTemp = surfaceTempC - (altM - elevM) * 0.004;
+      tempC = baseTemp + 1.5; // Temperature inversion
+    } else {
+      // Above inversion: standard lapse rate
+      const inversionTopAlt = 44330 * (1 - Math.pow(850 / 1013.25, 0.1903));
+      const inversionTopTemp = surfaceTempC - (inversionTopAlt - elevM) * 0.004 + 1.5;
+      tempC = inversionTopTemp - (altM - inversionTopAlt) * 0.0065;
+    }
+
+    // Dew point: decreases faster with altitude
+    const dewDropRate = 0.002;  // °C/m of dew point depression increase
+    const dewPointC = surfaceDewC - (altM - elevM) * dewDropRate;
+
+    // Wind increases with altitude, veers clockwise
+    const baseWindSpeed = 5 + (altFt / 1000) * 2.5;
+    const windDir = (270 + (altFt / 1000) * 3) % 360;
+
+    return {
+      pressure,
+      temperature: Math.round(tempC * 9/5 + 32),
+      dewPoint: Math.round(dewPointC * 9/5 + 32),
+      windSpeed: Math.round(baseWindSpeed),
+      windDirection: Math.round(windDir),
+      geopotentialHeight: Math.round(altM),
+    };
+  });
+
+  return {
+    levels,
+    surfaceElevation: site.elevation,
+    hour: targetHour,
+  };
+};
+
+export const fetchSoundingData = async (
+  site: LaunchSite,
+  targetDate: string,
+  targetHour: number
+): Promise<SoundingData | null> => {
+  const data = await fetchPressureLevelData(site);
+  if (data) {
+    const sounding = extractSoundingData(site, data, targetDate, targetHour);
+    if (sounding) return sounding;
+  }
+  // Fallback to generated data when API is unavailable
+  return generateFallbackSounding(site, targetHour);
 };
 
 export const getWindDirection = (degrees: number): string => {

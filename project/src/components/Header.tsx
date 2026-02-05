@@ -3,13 +3,29 @@ import { RefreshCw } from 'lucide-react';
 
 interface HeaderProps {
   lastUpdated: Date;
+  dataSource: 'live' | 'cached' | 'stale';
   onRefresh: () => void;
   isLoading: boolean;
   view: 'today' | 'weekly';
   onViewChange: (view: 'today' | 'weekly') => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ lastUpdated, onRefresh, isLoading, view, onViewChange }) => {
+const formatAge = (date: Date): string => {
+  const ageMs = Date.now() - date.getTime();
+  const mins = Math.round(ageMs / 60000);
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  const remMins = mins % 60;
+  if (hours < 24) return remMins > 0 ? `${hours}h ${remMins}m ago` : `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  const remHours = hours % 24;
+  return remHours > 0 ? `${days}d ${remHours}h ago` : `${days}d ago`;
+};
+
+const Header: React.FC<HeaderProps> = ({ lastUpdated, dataSource, onRefresh, isLoading, view, onViewChange }) => {
+  const ageMs = Date.now() - lastUpdated.getTime();
+  const isDelayed = dataSource === 'stale' || ageMs > 3 * 60 * 60 * 1000;
+
   return (
     <header className="bg-white border-b border-neutral-200">
       <div className="max-w-6xl mx-auto px-4 py-4">
@@ -140,6 +156,18 @@ const Header: React.FC<HeaderProps> = ({ lastUpdated, onRefresh, isLoading, view
           </div>
         </div>
       </div>
+
+      {/* Stale data warning */}
+      {isDelayed && (
+        <div className="max-w-6xl mx-auto px-4">
+          <div className="py-1.5 flex items-center gap-2">
+            <div className="w-1.5 h-1.5 rounded-full bg-amber-400 flex-shrink-0" />
+            <span className="font-mono text-[10px] text-neutral-500 tracking-wide">
+              Weather data import is delayed, last updated: {formatAge(lastUpdated)}
+            </span>
+          </div>
+        </div>
+      )}
     </header>
   );
 };

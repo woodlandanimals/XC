@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
-import { SiteForecast } from '../types/weather';
-import { getWindDirection } from '../services/weatherService';
+import React, { useState, useEffect, useRef } from 'react';
+import { SiteForecast, SoundingData } from '../types/weather';
+import { getWindDirection, fetchSoundingData } from '../services/weatherService';
 import { X, ChevronDown, ChevronUp } from 'lucide-react';
 import HourlyChart from './HourlyChart';
+import SkewTDiagram from './SkewTDiagram';
 import WindArrow from './WindArrow';
 
 interface SiteDetailModalProps {
@@ -13,6 +14,44 @@ interface SiteDetailModalProps {
 const SiteDetailModal: React.FC<SiteDetailModalProps> = ({ siteForecast, onClose }) => {
   const { site, forecast } = siteForecast;
   const [expandedDay, setExpandedDay] = useState<string | null>(null);
+  const [soundingCache, setSoundingCache] = useState<Record<string, SoundingData | null>>({});
+  const [loadingSounding, setLoadingSounding] = useState<string | null>(null);
+  const [selectedHour, setSelectedHour] = useState(12);
+  const soundingCacheRef = useRef(soundingCache);
+  soundingCacheRef.current = soundingCache;
+
+  // Fetch sounding data when a day is expanded or hour changes
+  useEffect(() => {
+    if (!expandedDay) return;
+
+    const cacheKey = `${expandedDay}-${selectedHour}`;
+    if (soundingCacheRef.current[cacheKey] !== undefined) return;
+
+    let cancelled = false;
+    setLoadingSounding(expandedDay);
+
+    fetchSoundingData(site, expandedDay, selectedHour)
+      .then(data => {
+        if (!cancelled) {
+          setSoundingCache(prev => ({ ...prev, [cacheKey]: data }));
+        }
+      })
+      .catch(error => {
+        console.error('Failed to fetch sounding data:', error);
+        if (!cancelled) {
+          setSoundingCache(prev => ({ ...prev, [cacheKey]: null }));
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingSounding(null);
+      });
+
+    return () => { cancelled = true; };
+  }, [expandedDay, selectedHour, site]);
+
+  const handleHourChange = (hour: number) => {
+    setSelectedHour(hour);
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -47,6 +86,14 @@ const SiteDetailModal: React.FC<SiteDetailModalProps> = ({ siteForecast, onClose
       day: 'numeric'
     });
   };
+
+  const formatHourLabel = (h: number) => {
+    if (h === 12) return '12p';
+    if (h > 12) return `${h - 12}p`;
+    return `${h}a`;
+  };
+
+  const soundingHours = [9, 10, 11, 12, 13, 14, 15, 16];
 
   return (
     <div
@@ -221,12 +268,55 @@ const SiteDetailModal: React.FC<SiteDetailModalProps> = ({ siteForecast, onClose
                     Hourly Breakdown
                   </button>
                   {expandedDay === day.date && (
-                    <div className="mt-3 bg-white border border-neutral-200 p-4">
-                      <HourlyChart
-                        hourlyData={day.hourlyData}
-                        siteElevation={site.elevation}
-                        maxWind={site.maxWind}
-                      />
+                    <div className="mt-3 space-y-4">
+                      {/* Hourly temp/wind chart */}
+                      <div className="bg-white border border-neutral-200 p-4">
+                        <HourlyChart
+                          hourlyData={day.hourlyData}
+                          siteElevation={site.elevation}
+                          maxWind={site.maxWind}
+                        />
+                      </div>
+
+                      {/* Sounding Diagram */}
+                      <div className="bg-white border border-neutral-200 p-4">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="font-mono text-[10px] uppercase tracking-wider text-neutral-500">
+                            Atmospheric Sounding
+                          </div>
+                          {/* Hour selector */}
+                          <div className="flex gap-1">
+                            {soundingHours.map(h => (
+                              <button
+                                key={h}
+                                onClick={() => handleHourChange(h)}
+                                className={`font-mono text-[9px] px-1.5 py-0.5 border transition-colors ${
+                                  selectedHour === h
+                                    ? 'border-neutral-900 bg-neutral-900 text-white'
+                                    : 'border-neutral-300 text-neutral-500 hover:border-neutral-500'
+                                }`}
+                              >
+                                {formatHourLabel(h)}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {loadingSounding === day.date ? (
+                          <div className="flex items-center justify-center py-12 bg-[#2d2d2d]">
+                            <div className="w-5 h-5 border-2 border-white/30 border-t-white/80 rounded-full animate-spin" />
+                          </div>
+                        ) : soundingCache[`${day.date}-${selectedHour}`] ? (
+                          <SkewTDiagram
+                            soundingData={soundingCache[`${day.date}-${selectedHour}`]!}
+                            siteElevation={site.elevation}
+                          />
+                        ) : (
+                          <div className="font-mono text-[10px] text-neutral-400 text-center py-12 bg-[#2d2d2d]">
+                            Sounding data not available
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>

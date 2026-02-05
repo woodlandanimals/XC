@@ -11,15 +11,17 @@ function App() {
   const [forecasts, setForecasts] = useState<SiteForecast[]>([]);
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState(new Date());
+  const [dataSource, setDataSource] = useState<'live' | 'cached' | 'stale'>('live');
   const [selectedSite, setSelectedSite] = useState<SiteForecast | null>(null);
   const [view, setView] = useState<'today' | 'weekly'>('today');
 
   const fetchForecasts = async () => {
     try {
       setLoading(true);
-      const data = await getWeatherForecast();
-      setForecasts(data);
-      setLastUpdated(new Date());
+      const result = await getWeatherForecast();
+      setForecasts(result.forecasts);
+      setLastUpdated(result.dataTimestamp);
+      setDataSource(result.dataSource);
     } catch (error) {
       console.error('Failed to fetch weather data:', error);
     } finally {
@@ -76,6 +78,7 @@ function App() {
     <div className="min-h-screen bg-neutral-50">
       <Header
         lastUpdated={lastUpdated}
+        dataSource={dataSource}
         onRefresh={fetchForecasts}
         isLoading={loading}
         view={view}

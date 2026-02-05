@@ -16,8 +16,8 @@ const HourlyChart: React.FC<HourlyChartProps> = ({ hourlyData, siteElevation, ma
   // Chart dimensions
   const width = 100; // percentage-based for responsiveness
   const tempChartHeight = 100;
-  const windChartHeight = 60;
-  const padding = { top: 15, right: 10, bottom: 25, left: 35 };
+  const windChartHeight = 70;
+  const padding = { top: 15, right: 10, bottom: 35, left: 35 };
 
   // Calculate scales
   const temps = hourlyData.map(d => d.temperature);
@@ -39,8 +39,9 @@ const HourlyChart: React.FC<HourlyChartProps> = ({ hourlyData, siteElevation, ma
     return padding.top + ((maxTemp - temp) / tempRange) * tempChartHeight;
   };
 
+  const windTop = padding.top + tempChartHeight + 30;
+
   const getWindY = (speed: number) => {
-    const windTop = padding.top + tempChartHeight + 30;
     return windTop + windChartHeight - (speed / maxWindSpeed) * windChartHeight;
   };
 
@@ -56,6 +57,18 @@ const HourlyChart: React.FC<HourlyChartProps> = ({ hourlyData, siteElevation, ma
     if (hour > 12) return `${hour - 12}p`;
     return `${hour}a`;
   };
+
+  // Wind grid lines
+  const getWindGridLines = (maxSpeed: number): number[] => {
+    const step = maxSpeed <= 15 ? 5 : maxSpeed <= 30 ? 10 : 15;
+    const lines: number[] = [];
+    for (let v = step; v < maxSpeed; v += step) {
+      lines.push(v);
+    }
+    return lines;
+  };
+
+  const windGridLines = getWindGridLines(maxWindSpeed);
 
   // Generate path for temperature line
   const tempPath = hourlyData
@@ -74,7 +87,6 @@ const HourlyChart: React.FC<HourlyChartProps> = ({ hourlyData, siteElevation, ma
     return prevD.temperature < prevD.tcon && d.temperature >= d.tcon;
   });
 
-  const windTop = padding.top + tempChartHeight + 30;
   const totalHeight = windTop + windChartHeight + padding.bottom;
   const barWidth = (100 - padding.left - padding.right) / hourlyData.length * 0.7;
 
@@ -235,7 +247,7 @@ const HourlyChart: React.FC<HourlyChartProps> = ({ hourlyData, siteElevation, ma
           className="fill-neutral-500"
           style={{ fontSize: '2.5px', fontFamily: 'monospace', textTransform: 'uppercase', letterSpacing: '0.05em' }}
         >
-          WIND
+          WIND (MPH)
         </text>
 
         {/* Wind section background */}
@@ -248,6 +260,34 @@ const HourlyChart: React.FC<HourlyChartProps> = ({ hourlyData, siteElevation, ma
           stroke="#e5e5e5"
           strokeWidth="0.3"
         />
+
+        {/* Wind grid lines */}
+        {windGridLines.map(speed => {
+          const y = getWindY(speed);
+          return (
+            <g key={`wind-grid-${speed}`}>
+              <line
+                x1={padding.left}
+                y1={y}
+                x2={100 - padding.right}
+                y2={y}
+                stroke="#e5e5e5"
+                strokeWidth="0.15"
+                strokeDasharray="0.5,0.5"
+              />
+              <text
+                x={padding.left - 2}
+                y={y}
+                textAnchor="end"
+                dominantBaseline="middle"
+                className="fill-neutral-400"
+                style={{ fontSize: '2px', fontFamily: 'monospace' }}
+              >
+                {speed}
+              </text>
+            </g>
+          );
+        })}
 
         {/* Max wind threshold line */}
         <line
@@ -266,7 +306,7 @@ const HourlyChart: React.FC<HourlyChartProps> = ({ hourlyData, siteElevation, ma
           className="fill-red-500"
           style={{ fontSize: '2px', fontFamily: 'monospace' }}
         >
-          Max
+          {maxWind}
         </text>
 
         {/* Wind bars */}
@@ -296,13 +336,44 @@ const HourlyChart: React.FC<HourlyChartProps> = ({ hourlyData, siteElevation, ma
                 height={barHeight}
                 fill={getWindColor(d.windSpeed)}
               />
-              {/* Wind direction indicator */}
+              {/* Wind speed label on top of bar */}
               <text
                 x={x}
-                y={windTop + windChartHeight + 5}
+                y={windTop + windChartHeight - Math.max(barHeight, gustHeight) - 1.5}
                 textAnchor="middle"
-                className="fill-neutral-500"
-                style={{ fontSize: '2px', fontFamily: 'monospace' }}
+                dominantBaseline="baseline"
+                className="fill-neutral-700"
+                style={{ fontSize: '2.2px', fontFamily: 'monospace', fontWeight: 'bold' }}
+              >
+                {d.windSpeed}
+              </text>
+              {/* Gust label */}
+              {d.windGust > d.windSpeed + 3 && (
+                <text
+                  x={x}
+                  y={windTop + windChartHeight - Math.max(barHeight, gustHeight) - 4}
+                  textAnchor="middle"
+                  dominantBaseline="baseline"
+                  className="fill-neutral-400"
+                  style={{ fontSize: '1.8px', fontFamily: 'monospace' }}
+                >
+                  G{d.windGust}
+                </text>
+              )}
+              {/* Wind direction arrow */}
+              <g transform={`translate(${x}, ${windTop + windChartHeight + 5})`}>
+                <g transform={`rotate(${d.windDirection + 180})`}>
+                  <line x1="0" y1="2" x2="0" y2="-2" stroke="#525252" strokeWidth="0.4" />
+                  <polygon points="0,-3 -1,-1.5 1,-1.5" fill="#525252" />
+                </g>
+              </g>
+              {/* Wind direction text label */}
+              <text
+                x={x}
+                y={windTop + windChartHeight + 10}
+                textAnchor="middle"
+                className="fill-neutral-400"
+                style={{ fontSize: '1.8px', fontFamily: 'monospace' }}
               >
                 {getWindDirection(d.windDirection)}
               </text>
@@ -318,7 +389,7 @@ const HourlyChart: React.FC<HourlyChartProps> = ({ hourlyData, siteElevation, ma
             <text
               key={`time-${i}`}
               x={getX(i)}
-              y={windTop + windChartHeight + 12}
+              y={windTop + windChartHeight + 15}
               textAnchor="middle"
               className="fill-neutral-600"
               style={{ fontSize: '2.5px', fontFamily: 'monospace' }}
@@ -328,7 +399,7 @@ const HourlyChart: React.FC<HourlyChartProps> = ({ hourlyData, siteElevation, ma
           );
         })}
 
-        {/* Wind scale */}
+        {/* Wind scale labels */}
         <text
           x={padding.left - 2}
           y={windTop}

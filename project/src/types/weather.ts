@@ -1,5 +1,20 @@
 export type SiteType = 'thermal' | 'soaring' | 'mixed';
 
+export interface PressureLevelData {
+  pressure: number;           // hPa
+  temperature: number;        // °F
+  dewPoint: number;           // °F
+  windSpeed: number;          // mph
+  windDirection: number;      // degrees
+  geopotentialHeight: number; // meters (from API)
+}
+
+export interface SoundingData {
+  levels: PressureLevelData[];  // sorted by pressure descending (surface first)
+  surfaceElevation: number;     // site elevation in feet MSL
+  hour: number;
+}
+
 export interface LaunchSite {
   id: string;
   name: string;
