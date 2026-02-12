@@ -200,5 +200,15 @@ export const launchSites: LaunchSite[] = [
     orientation: 'W-NW',
     maxWind: 15,
     siteType: 'thermal'  // Owens Valley thermal
+  },
+  {
+    id: 'vollmer-peak',
+    name: 'Vollmer Peak',
+    elevation: 1905,
+    latitude: 37.8838,
+    longitude: -122.2204,
+    orientation: 'NE-SE',
+    maxWind: 18,
+    siteType: 'mixed'  // Berkeley Hills ridge + thermal
   }
 ];
